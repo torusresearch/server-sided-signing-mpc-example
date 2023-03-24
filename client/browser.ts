@@ -11,6 +11,8 @@ const { generateEndpoints, getDKLSCoeff, setupSockets } = utils;
 import { ec as EC } from "elliptic";
 import keccak256 from "keccak256";
 import { TorusLoginResponse } from "@toruslabs/customauth";
+import { EthereumSigningProvider } from "@web3auth-mpc/ethereum-provider";
+import Web3 from "web3";
 
 const ec = new EC("secp256k1");
 
@@ -35,7 +37,25 @@ const set = (key: string, value: string) => {
 export class MpcLoginProvider {
   public tKey: ThresholdKey;
 
+  public ethereumSigningProvider: EthereumSigningProvider;
+
   constructor() {
+    this.ethereumSigningProvider = new EthereumSigningProvider({
+      config: {
+        /*
+                      pass the chain config that you want to connect with
+                      all chainConfig fields are required.
+                      */
+        chainConfig: {
+          chainId: "0x5",
+          rpcTarget: "https://rpc.ankr.com/eth_goerli",
+          displayName: "Goerli Testnet",
+          blockExplorer: "https://goerli.etherscan.io",
+          ticker: "ETH",
+          tickerName: "Ethereum",
+        },
+      },
+    });
     // Authentication configs
     const torusSp = new TorusServiceProvider({
       useTSS: true,
@@ -164,9 +184,9 @@ export class MpcLoginProvider {
     return this.tKey.getTSSShare(this.getDeviceFactorKey());
   }
 
-  async sign(msg: string) {
-    if (!msg) throw new Error("msgHashHex not provided")
-    const msgHashHex = keccak256(msg).toString("hex");
+  async sign(msgHashBuffer: Buffer) {
+    if (!msgHashBuffer) throw new Error("msgHashHex not provided")
+    const msgHashHex = keccak256(msgHashBuffer).toString("hex");
     // get auth signatures from loginResponse (must call triggerLogin first)
     const loginResponse = get('loginResponse');
     if (!loginResponse) {
@@ -230,7 +250,7 @@ export class MpcLoginProvider {
     client.precompute(tss, { signatures, server_coeffs: serverCoeffs });
     await client.ready();
     const msgHashBase64 = Buffer.from(msgHashHex, 'hex').toString('base64');
-    const signature = await client.sign(tss, msgHashBase64, true, msg, 'keccak256', {
+    const signature = await client.sign(tss, msgHashBase64, true, msgHashHex, 'keccak256', {
       signatures,
     });
 
@@ -240,7 +260,7 @@ export class MpcLoginProvider {
     if (!passed) {
       throw new Error('invalid signature')
     }
-    return signature
+    return { v:  signature.recoveryParam, r: Buffer.from(signature.r.toString("hex"), "hex"), s: Buffer.from(signature.s.toString("hex"), "hex") };
   }
 
   // Reset account, for testing purposes
@@ -251,6 +271,38 @@ export class MpcLoginProvider {
     });
     window.location.reload();
   }
+
+  async getWeb3Instance() {
+    const tssPubKey =  this.tKey.getTSSPub();
+    const compressedTSSPubKey = Buffer.from(`${tssPubKey.x.toString(16, 64)}${tssPubKey.y.toString(16, 64)}`, "hex");
+
+    if (!tssPubKey) {
+      throw new Error("Please login first")
+    }
+    await this.ethereumSigningProvider.setupProvider({ sign: this.sign.bind(this), getPublic: () => compressedTSSPubKey  });
+    console.log(this.ethereumSigningProvider.provider);
+    const web3 = new Web3(this.ethereumSigningProvider.provider as any);
+    return web3;
+  }
+
+   async getAccounts() {
+     const web3 = await this.getWeb3Instance();
+    const address = (await web3.eth.getAccounts())[0];
+    return address;
+  };
+
+  async signTransaction() {
+    const web3 = await this.getWeb3Instance();
+    const fromAddress = await this.getAccounts()
+    const amount = web3.utils.toWei("0.0001"); // Convert 1 ether to wei
+
+    const signedTx = await web3.eth.signTransaction({
+      from: fromAddress,
+      to: fromAddress,
+      value: amount,
+    })
+    return signedTx;
+  };
   
 }
 
