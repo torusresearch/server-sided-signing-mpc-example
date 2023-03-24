@@ -164,8 +164,9 @@ export class MpcLoginProvider {
     return this.tKey.getTSSShare(this.getDeviceFactorKey());
   }
 
-  async sign(msgHashHex: string) {
-    if (!msgHashHex) throw new Error("msgHashHex not provided")
+  async sign(msg: string) {
+    if (!msg) throw new Error("msgHashHex not provided")
+    const msgHashHex = keccak256(msg).toString("hex");
     // get auth signatures from loginResponse (must call triggerLogin first)
     const loginResponse = get('loginResponse');
     if (!loginResponse) {
@@ -229,11 +230,11 @@ export class MpcLoginProvider {
     client.precompute(tss, { signatures, server_coeffs: serverCoeffs });
     await client.ready();
     const msgHashBase64 = Buffer.from(msgHashHex, 'hex').toString('base64');
-    const signature = await client.sign(tss, msgHashBase64, true, '', '', {
+    const signature = await client.sign(tss, msgHashBase64, true, msg, 'keccak256', {
       signatures,
     });
 
-    const pubk = ec.recoverPubKey(new BN(msgHashHex), signature, signature.recoveryParam, "hex");
+    const pubk = ec.recoverPubKey(new BN(msgHashHex, "hex"), signature, signature.recoveryParam, "hex");
     const passed = ec.verify(msgHashHex, signature, pubk);
     await client.cleanup(tss, { signatures });
     if (!passed) {
