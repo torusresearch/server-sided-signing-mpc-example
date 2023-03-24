@@ -1,0 +1,5 @@
+dist/
+js/
+serviceworker/
+node_modules/
+public/

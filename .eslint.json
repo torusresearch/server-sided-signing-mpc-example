@@ -1,0 +1,19 @@
+{
+    "extends": ["@toruslabs/typescript"],
+    "parser": "@typescript-eslint/parser",
+    "ignorePatterns": ["*.config.js"],
+    "parserOptions": {
+      "sourceType": "module",
+      "ecmaVersion": 11,
+      "project": "./tsconfig.json"
+    },
+    "rules": {
+      "no-console": 1
+    },
+    "env": {
+      "es2020": true,
+      "browser": true,
+      "jquery": true
+    }
+  }
+  

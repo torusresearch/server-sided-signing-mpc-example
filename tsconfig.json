@@ -1,0 +1,17 @@
+{
+    "compilerOptions": {
+      "rootDir": ".",
+      "moduleResolution": "node",
+      "strict": false,
+      "module": "es6",
+      "target": "esnext",
+      "lib": ["ES2020", "DOM"],
+      "esModuleInterop": true,
+      "noImplicitThis": true,
+      "outDir": "./dist",
+      "allowSyntheticDefaultImports": true,
+      "skipLibCheck": true
+    },
+    "include": ["client"]
+  }
+  
