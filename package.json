@@ -7,6 +7,7 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "build": "rimraf dist/ && cross-env NODE_ENV=production webpack",
     "start": "cross-env NODE_ENV=development webpack serve",
+    "server": "node server/server.js",
     "lint": "eslint --cache --fix '*.ts'"
   },
   "dependencies": {
@@ -29,6 +30,7 @@
     "antd": "^5.3.2",
     "bn.js": "^5.2.1",
     "browserify": "^17.0.0",
+    "cors": "^2.8.5",
     "elliptic": "^6.5.4",
     "express": "^4.18.2",
     "jsrsasign": "^10.7.0",

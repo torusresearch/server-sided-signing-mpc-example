@@ -1,4 +1,8 @@
-export async function addFactorPub(tKey, newFactorPub, newFactorTSSIndex, inputFactorKey) {
+import { Point } from "@tkey/common-types";
+import { randomSelection, encrypt } from "@toruslabs/rss-client";
+import BN from "bn.js";
+
+export async function addFactorPub(tKey, newFactorPub: Point, newFactorTSSIndex: number, inputFactorKey: BN, signatures: string[]) {
   if (!tKey) {
     throw new Error('tkey does not exist, cannot add factor pub');
   }
@@ -12,9 +16,11 @@ export async function addFactorPub(tKey, newFactorPub, newFactorTSSIndex, inputF
     throw new Error('factorPubs does not exist');
   }
   const existingFactorPubs = tKey.metadata.factorPubs[tKey.tssTag].slice();
-  const updatedFactorPubs = existingFactorPubs.concat([newFactorPub]);
+  const compare = (f) => f.x.eq(newFactorPub.x) && f.y.eq(newFactorPub.y)
+  const found = existingFactorPubs.filter(compare).length > 0;
+  const updatedFactorPubs = found ? existingFactorPubs.slice() : existingFactorPubs.concat([newFactorPub]);
   const existingTSSIndexes = existingFactorPubs.map((fb) => tKey.getFactorEncs(fb).tssIndex);
-  const updatedTSSIndexes = existingTSSIndexes.concat([newFactorTSSIndex]);
+  const updatedTSSIndexes = found ? existingTSSIndexes.map((existingTSSIndex, i) => compare(existingFactorPubs[i]) ? newFactorTSSIndex : existingTSSIndex ) : existingTSSIndexes.concat([newFactorTSSIndex]);
   const { tssShare, tssIndex } = await tKey.getTSSShare(inputFactorKey);
   tKey.metadata.addTSSData({
     tssTag: tKey.tssTag,
@@ -39,13 +45,13 @@ export async function addFactorPub(tKey, newFactorPub, newFactorTSSIndex, inputF
       serverEndpoints,
       serverPubKeys,
       serverThreshold,
-      authSignatures: await this.getSignatures(),
+      authSignatures: signatures,
     },
   );
   // TODO: needs manual sync after add factor pub
 }
 
-export async function copyFactorPub(tKey, newFactorPub, newFactorTSSIndex, inputFactorKey) {
+export async function copyFactorPub(tKey: any, newFactorPub: Point, newFactorTSSIndex: number, inputFactorKey: BN) {
   if (!tKey) {
     throw new Error('tkey does not exist, cannot copy factor pub');
   }
@@ -65,7 +71,8 @@ export async function copyFactorPub(tKey, newFactorPub, newFactorTSSIndex, input
     throw new Error('factorEncs does not exist, failed in copy factor pub');
   }
   const existingFactorPubs = tKey.metadata.factorPubs[tKey.tssTag].slice();
-  const updatedFactorPubs = existingFactorPubs.concat([newFactorPub]);
+  const found = existingFactorPubs.filter((f) => f.x.eq(newFactorPub.x) && f.y.eq(newFactorPub.y)).length > 0;
+  const updatedFactorPubs = found ? existingFactorPubs.slice() : existingFactorPubs.concat([newFactorPub]);
   const { tssShare, tssIndex } = await tKey.getTSSShare(inputFactorKey);
   if (tssIndex !== newFactorTSSIndex) {
     throw new Error('retrieved tssIndex does not match input factor tssIndex');
@@ -93,7 +100,7 @@ export async function copyFactorPub(tKey, newFactorPub, newFactorTSSIndex, input
   // TODO: needs manual sync after copy factor pub
 }
 
-export async function deleteFactorPub(tKey, factorPub, inputFactorKey) {
+export async function deleteFactorPub(tKey, factorPub: Point, inputFactorKey: BN, verifierNameVerifierId: string, signatures: string[]) {
   if (!tKey) {
     throw new Error('tkey does not exist, cannot add factor pub');
   }
@@ -132,11 +139,11 @@ export async function deleteFactorPub(tKey, factorPub, inputFactorKey) {
     tssIndex,
     updatedFactorPubs,
     updatedTSSIndexes,
-    this.serviceProvider.getVerifierNameVerifierId(),
+    verifierNameVerifierId,
     {
       ...rssNodeDetails,
       selectedServers: randomSelectedServers,
-      authSignatures: await this.getSignatures(),
+      authSignatures: signatures,
     },
   );
   // TODO: needs manual sync after delete factor pub

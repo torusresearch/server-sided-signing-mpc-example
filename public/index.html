@@ -2,7 +2,13 @@
 <html>
   <head></head>
   <body>
-    Test
+    <button onclick="mpcProvider.triggerRegister()">Register</button><br/>
+    <button onclick="mpcProvider.triggerLogin()">Login</button><br/>
+    <button onclick="mpcProvider.initializeTkey()">Initialize TKey</button><br/>
+    <button onclick="mpcProvider.signTransaction('BROWSER')">Sign Transaction (web3auth + browser)</button><br/>
+    <button onclick="mpcProvider.addThirdPartyTSSServer()">Add third party TSS server</button><br/>
+    <button onclick="mpcProvider.signTransaction('SERVER')">Sign Transaction (web3auth + server.js)</button><br/>
+    <button onclick="mpcProvider.resetAccount()">Reset</button><br/>
     <script src="./bundle.js"></script>
   </body>
 </html>

@@ -3,3 +3,4 @@ js/
 serviceworker/
 node_modules/
 public/
+*.js

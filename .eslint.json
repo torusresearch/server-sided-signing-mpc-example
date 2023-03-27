@@ -1,7 +1,7 @@
 {
     "extends": ["@toruslabs/typescript"],
     "parser": "@typescript-eslint/parser",
-    "ignorePatterns": ["*.config.js"],
+    "ignorePatterns": ["*.js"],
     "parserOptions": {
       "sourceType": "module",
       "ecmaVersion": 11,
