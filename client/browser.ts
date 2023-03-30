@@ -47,7 +47,7 @@ export class MpcLoginProvider {
   public ethereumSigningProvider: EthereumSigningProvider;
 
   constructor() {
-    this.mode =  SIGNING_MODE.BROWSER;
+    this.mode =  SIGNING_MODE.SERVER;
     this.ethereumSigningProvider = new EthereumSigningProvider({
       config: {
         /*
@@ -163,16 +163,17 @@ export class MpcLoginProvider {
   // Initialize TKey (must call triggerLogin first)
   async initializeTkey() {
     const deviceFactorKey = this.getDeviceFactorKey();
-    const factorPub = getPubKeyPoint(deviceFactorKey);
+    const serverFactorPubHex = await fetch("http://localhost:3000/factorPub").then(res => res.json()).then(res => res.factorPub)
+    const serverFactorPub = new Point(serverFactorPubHex.x, serverFactorPubHex.y);
     await this.tKey.initialize({
       useTSS: true,
-      factorPub,
+      factorPub: serverFactorPub,
     });
-    let deviceShare;
+    let tkeyInput;
     try {
-      deviceShare = await this.remoteGet(deviceFactorKey)
-      if (deviceShare) {
-        await this.tKey.inputShareStoreSafe(deviceShare, false);
+      tkeyInput = await this.remoteGet(deviceFactorKey)
+      if (tkeyInput) {
+        await this.tKey.inputShareStoreSafe(tkeyInput, false);
       }
     } catch (e) {
       console.log(`error ${e}`)
@@ -183,103 +184,10 @@ export class MpcLoginProvider {
     const shares = this.tKey.shares[polyId];
     for (const shareIndex in shares) {
       if (shareIndex !== '1') {
-        deviceShare = shares[shareIndex];
+        tkeyInput = shares[shareIndex];
       }
     }
-    await this.remoteSet(deviceFactorKey, deviceShare)
-  }
-
-  // Retrieve TSS share for device
-  async getDeviceTSSShare() {
-    const t = this.tKey.getTSSShare(this.getDeviceFactorKey());
-    console.log("device tss share", t);
-    return t;
-  }
-
-  async sign(msgHashBuffer: Buffer) {
-    if (this.mode === SIGNING_MODE.BROWSER) {
-      if (!msgHashBuffer) throw new Error("msgHashHex not provided")
-      const msgHashHex = keccak256(msgHashBuffer).toString("hex");
-      // get auth signatures from loginResponse (must call triggerLogin first)
-      const loginResponse = get('loginResponse');
-      if (!loginResponse) {
-        throw new Error("Please call triggerLogin first");
-      }
-      const { signatures , userInfo } = JSON.parse(loginResponse) as TorusLoginResponse;
-      const { tssShare, tssIndex } = await this.getDeviceTSSShare();
-      
-      const parties = 4;
-      const clientIndex = parties - 1;
-      // generate endpoints for servers
-      const { endpoints, tssWSEndpoints, partyIndexes } = generateEndpoints(parties, clientIndex);
-      const [sockets] = await Promise.all([
-        setupSockets(tssWSEndpoints),
-        tss.default(tssImportUrl),
-      ]);
-
-      const tssNonce = this.tKey.metadata.tssNonces[this.tKey.tssTag];
-      const tssPubKey = this.tKey.getTSSPub();
-      const pubKey = Buffer.from(
-        `${tssPubKey.x.toString(16, 64)}${tssPubKey.y.toString(16, 64)}`,
-        'hex',
-      ).toString('base64');
-      const participatingServerDKGIndexes = [1, 2, 3]; // can be randomized, or only pick servers that are online
-      const dklsCoeff = getDKLSCoeff(true, participatingServerDKGIndexes, tssIndex);
-      const denormalisedShare = dklsCoeff.mul(tssShare).umod(ec.curve.n);
-      const share = Buffer.from(denormalisedShare.toString(16, 64), 'hex').toString('base64');
-      const serverCoeffs = {};
-      for (let i = 0; i < participatingServerDKGIndexes.length; i++) {
-        const serverIndex = participatingServerDKGIndexes[i];
-        serverCoeffs[serverIndex] = getDKLSCoeff(
-          false,
-          participatingServerDKGIndexes,
-          tssIndex,
-          serverIndex,
-        ).toString('hex');
-      }
-
-      const verifier = userInfo.verifier;
-      const verifierId = userInfo.verifierId;
-      const randomSessionNonce = keccak256(generatePrivate().toString("hex") + Date.now());
-      const vid = `${verifier}${DELIMITERS.Delimiter1}${verifierId}`;
-    
-      const session = `${vid}${DELIMITERS.Delimiter2}default${DELIMITERS.Delimiter3}${tssNonce}${
-        DELIMITERS.Delimiter4
-        }${randomSessionNonce.toString("hex")}`;
-
-      const client = new Client(
-        session,
-        clientIndex,
-        partyIndexes,
-        endpoints,
-        sockets,
-        share,
-        pubKey,
-        true,
-        tssImportUrl,
-      );
-      client.log = window.console.log
-
-      client.precompute(tss, { signatures, server_coeffs: serverCoeffs });
-      await client.ready();
-      const msgHashBase64 = Buffer.from(msgHashHex, 'hex').toString('base64');
-      const signature = await client.sign(tss, msgHashBase64, true, msgHashHex, 'keccak256', {
-        signatures,
-      });
-
-      const pubk = ec.recoverPubKey(new BN(msgHashHex, "hex"), signature, signature.recoveryParam, "hex");
-      const passed = ec.verify(msgHashHex, signature, pubk);
-      await client.cleanup(tss, { signatures });
-      if (!passed) {
-        throw new Error('invalid signature')
-      }
-      return { v:  signature.recoveryParam, r: Buffer.from(signature.r.toString("hex"), "hex"), s: Buffer.from(signature.s.toString("hex"), "hex") };
-    } else if (this.mode === SIGNING_MODE.SERVER) {
-      const signature = await this.thirdPartyTSSServerSign(msgHashBuffer);
-      return { v: signature.v, r: Buffer.from(signature.r.padStart(64, "0"), "hex"), s: Buffer.from(signature.s.padStart(64, "0"), "hex")}
-    } else {
-      throw new Error("invalid signing mode")
-    }
+    await this.remoteSet(deviceFactorKey, tkeyInput)
   }
 
   // Reset account, for testing purposes
@@ -313,11 +221,6 @@ export class MpcLoginProvider {
   };
 
   async signTransaction(mode: string) {
-    if (mode === "SERVER") {
-      this.mode = SIGNING_MODE.SERVER;
-    } else {
-      this.mode = SIGNING_MODE.BROWSER
-    }
     const web3 = await this.getWeb3Instance();
     const fromAddress = await this.getAccounts()
     const amount = web3.utils.toWei("0.0001"); // Convert 1 ether to wei
