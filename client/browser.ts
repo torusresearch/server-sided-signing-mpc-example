@@ -13,16 +13,12 @@ import keccak256 from "keccak256";
 import { TorusLoginResponse } from "@toruslabs/customauth";
 import { EthereumSigningProvider } from "@web3auth-mpc/ethereum-provider";
 import Web3 from "web3";
-import { copyFactorPub } from "../rss"
+import { addFactorPub, copyFactorPub } from "../rss"
 
 enum SIGNING_MODE {
   BROWSER,
   SERVER,
 }
-
-const ec = new EC("secp256k1");
-
-const tssImportUrl = "https://sapphire-dev-2-2.authnetwork.dev/tss/v1/clientWasm";
 
 const DELIMITERS = {
   Delimiter1: "\u001c",
@@ -160,6 +156,11 @@ export class MpcLoginProvider {
     return d
   }
 
+  async sign(msgHashBuffer: Buffer) {
+    const signature = await this.thirdPartyTSSServerSign(msgHashBuffer);
+    return { v: signature.v, r: Buffer.from(signature.r.padStart(64, "0"), "hex"), s: Buffer.from(signature.s.padStart(64, "0"), "hex")}
+  }
+
   // Initialize TKey (must call triggerLogin first)
   async initializeTkey() {
     const deviceFactorKey = this.getDeviceFactorKey();
@@ -220,7 +221,7 @@ export class MpcLoginProvider {
     return address;
   };
 
-  async signTransaction(mode: string) {
+  async signTransaction() {
     const web3 = await this.getWeb3Instance();
     const fromAddress = await this.getAccounts()
     const amount = web3.utils.toWei("0.0001"); // Convert 1 ether to wei
@@ -233,17 +234,6 @@ export class MpcLoginProvider {
     console.log("signedTx", signedTx);
     return signedTx;
   };
-
-  async addThirdPartyTSSServer() {
-    const serverFactorPubHex = await fetch("http://localhost:3000/factorPub").then(res => res.json()).then(res => res.factorPub)
-    const serverFactorPub = new Point(serverFactorPubHex.x, serverFactorPubHex.y);
-    const deviceFactorKey = await this.getDeviceFactorKey();
-    await copyFactorPub(this.tKey, serverFactorPub, 2, deviceFactorKey);
-
-    // manual sync
-    await this.tKey._syncShareMetadata();
-    await this.tKey.syncLocalMetadataTransitions();
-  }
 
   async thirdPartyTSSServerSign(msgHashBuffer: Buffer) {
     const serverFactorPubHex = await fetch("http://localhost:3000/factorPub").then(res => res.json()).then(res => res.factorPub)

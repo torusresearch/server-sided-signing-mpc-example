@@ -21,8 +21,6 @@ app.use(cors({
   origin: '*'
 }));
 
-const tssImportUrl = "https://sapphire-dev-2-2.authnetwork.dev/tss/v1/clientWasm";
-
 const DELIMITERS = {
   Delimiter1: "\u001c",
   Delimiter2: "\u0015",
@@ -30,7 +28,7 @@ const DELIMITERS = {
   Delimiter4: "\u0017",
 };
 
-const serverFactorKey = new BN(generatePrivate())
+const serverFactorKey = new BN("deadbeef", "hex") // fixed value so that server restarts dont require server to be re-added as a factor
 const serverFactorPub = getPubKeyPoint(serverFactorKey);
 
 async function getTSSShare(factorEncs, tssCommits) {
@@ -139,7 +137,7 @@ async function sign(msgHashBuffer, {
     share,
     pubKey,
     true,
-    tssImportUrl,
+    "",
   );
 
   client.precompute(tss, { signatures, server_coeffs: serverCoeffs });
@@ -182,4 +180,5 @@ app.post("/sign", async (req, res) => {
    });
 
 })
+
 app.listen(3000);
