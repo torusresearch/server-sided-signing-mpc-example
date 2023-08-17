@@ -3,9 +3,9 @@ const { utils, Client } = require('@toruslabs/tss-client')
 const tss = require("./node")
 console.log("WHAT IS TSS", tss)
 const { generateEndpoints, setupSockets, getDKLSCoeff } = utils;
-const { getPubKeyPoint, decrypt } = require('@tkey/common-types')
+const { getPubKeyPoint, decrypt } = require('@tkey-mpc/common-types')
 const keccak256 = require("keccak256");
-const { TorusStorageLayer } = require("@tkey/storage-layer-torus");
+const { TorusStorageLayer } = require("@tkey-mpc/storage-layer-torus");
 const BN = require('bn.js')
 var express = require('express');
 const cors = require('cors');

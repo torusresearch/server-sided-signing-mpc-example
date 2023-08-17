@@ -1,4 +1,4 @@
-const { ecCurve, generatePrivateExcludingIndexes, Point, Polynomial, Share } = require("@tkey/common-types");
+const { ecCurve, generatePrivateExcludingIndexes, Point, Polynomial, Share } = require("@tkey-mpc/common-types");
 const { generatePrivate } = require("@toruslabs/eccrypto");
 const BN = require('bn.js')
 

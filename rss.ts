@@ -1,4 +1,4 @@
-import { Point } from "@tkey/common-types";
+import { Point } from "@tkey-mpc/common-types";
 import { randomSelection, encrypt } from "@toruslabs/rss-client";
 import BN from "bn.js";
 
